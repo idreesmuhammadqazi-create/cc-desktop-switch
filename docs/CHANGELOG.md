@@ -7,6 +7,12 @@
   <a href="CHANGELOG.md">Changelog</a>
 </p>
 
+## v1.0.26
+
+Release notes: [docs/release-notes-v1.0.26.md](release-notes-v1.0.26.md)
+
+- Added `chatTabEnabled` to the Claude Desktop 3P policy writes so the Chat tab appears alongside Cowork and Code after applying the local gateway config.
+
 ## v1.0.25
 
 Release notes: [docs/release-notes-v1.0.25.md](release-notes-v1.0.25.md)
