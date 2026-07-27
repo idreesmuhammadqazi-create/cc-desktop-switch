@@ -625,6 +625,7 @@ class ProviderConfigTests(unittest.TestCase):
         ])
         self.assertIs(saved["enterpriseConfig"]["isClaudeCodeForDesktopEnabled"], True)
         self.assertEqual(saved["enterpriseConfig"]["coworkEgressAllowedHosts"], ["*"])
+        self.assertIs(saved["enterpriseConfig"]["chatTabEnabled"], True)
 
     def test_macos_apply_config_writes_active_config_library_entry(self):
         json_path = os.path.join(self.temp_dir.name, "Claude-3p", "claude_desktop_config.json")
@@ -669,6 +670,7 @@ class ProviderConfigTests(unittest.TestCase):
         ])
         self.assertIs(saved["isClaudeCodeForDesktopEnabled"], True)
         self.assertEqual(saved["coworkEgressAllowedHosts"], ["*"])
+        self.assertIs(saved["chatTabEnabled"], True)
 
     def test_macos_status_prefers_json_runtime_values_over_stale_plist_models(self):
         json_path = os.path.join(self.temp_dir.name, "Claude-3p", "claude_desktop_config.json")
@@ -1017,6 +1019,7 @@ class ProviderConfigTests(unittest.TestCase):
             "inferenceModels",
             "isClaudeCodeForDesktopEnabled",
             "coworkEgressAllowedHosts",
+            "chatTabEnabled",
             "ccds_managed",
             "unrelatedPreference",
         ]
@@ -1032,6 +1035,7 @@ class ProviderConfigTests(unittest.TestCase):
                 "inferenceModels",
                 "isClaudeCodeForDesktopEnabled",
                 "coworkEgressAllowedHosts",
+                "chatTabEnabled",
                 "ccds_managed",
             ],
         )

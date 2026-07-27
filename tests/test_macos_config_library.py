@@ -42,6 +42,7 @@ class MacosConfigLibraryTests(unittest.TestCase):
         ])
         self.assertIs(saved["isClaudeCodeForDesktopEnabled"], True)
         self.assertEqual(saved["coworkEgressAllowedHosts"], ["*"])
+        self.assertIs(saved["chatTabEnabled"], True)
 
 
 if __name__ == "__main__":
