@@ -1150,6 +1150,28 @@ class ProviderConfigTests(unittest.TestCase):
         self.assertIn("claude-haiku-4-5-20251001", inference_model_names)
         self.assertNotIn("deepseek-v4-pro", inference_model_names)
 
+    def test_bracket_variant_route_ids_are_accepted(self):
+        provider = {
+            "id": "third-party",
+            "name": "Third-Party 1M",
+            "models": {
+                "claude-opus-4-7[1m]": "minimax-m3",
+            },
+            "modelCapabilities": {
+                "minimax-m3": {"supports1m": True},
+            },
+        }
+
+        desktop_models = registry.provider_inference_models(provider)
+        names = {item["name"] for item in desktop_models}
+        self.assertIn("claude-opus-4-7[1m]", names)
+        entry = next(item for item in desktop_models if item["name"] == "claude-opus-4-7[1m]")
+        self.assertTrue(entry.get("supports1m"))
+
+        inference_models = json.loads(registry.serialize_inference_models(provider))
+        inference_model_names = [item["name"] for item in inference_models]
+        self.assertIn("claude-opus-4-7[1m]", inference_model_names)
+
     def test_settings_fall_back_to_default_update_url(self):
         config = copy.deepcopy(cfg.DEFAULT_CONFIG)
         config["settings"]["updateUrl"] = ""
