@@ -89,7 +89,7 @@
     const knownKeys = new Set(['default', 'opus', 'opus_4_7', 'opus_4_6', 'opus_3', 'sonnet', 'sonnet_4_6', 'sonnet_4_5', 'haiku', 'haiku_4_5']);
     const customMappings = {};
     for (const [key, value] of Object.entries(models)) {
-      if (!knownKeys.has(key) && /^claude-[A-Za-z0-9][A-Za-z0-9._-]*$/.test(key) && typeof value === 'string' && value.trim()) {
+      if (!knownKeys.has(key) && /^claude-[A-Za-z0-9][A-Za-z0-9._\[\]-]*$/.test(key) && typeof value === 'string' && value.trim()) {
         customMappings[key] = value.trim();
       }
     }

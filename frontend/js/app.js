@@ -1824,6 +1824,17 @@
   }
 
   async function saveProviderFromForm() {
+    if (editingProviderId) {
+      try {
+        const providers = await CCApi.getProviders();
+        const current = providers.find((item) => item.id === editingProviderId);
+        if (current && current.modelCapabilities && typeof current.modelCapabilities === "object") {
+          formModelCapabilities = normalizeCapabilities(current.modelCapabilities);
+        }
+      } catch (error) {
+        console.warn("Failed to refresh modelCapabilities before save:", error);
+      }
+    }
     const payload = providerPayloadFromForm(true);
     if (editingProviderId) {
       const provider = await CCApi.updateProvider(editingProviderId, payload);

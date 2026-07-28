@@ -1063,6 +1063,35 @@ class ProviderConfigTests(unittest.TestCase):
         cleared = cfg.update_provider(provider["id"], {"requestOptions": {}})
         self.assertEqual(cleared["requestOptions"], {})
 
+    def test_update_provider_preserves_model_capabilities_when_payload_omits_them(self):
+        """When a provider update omits modelCapabilities, the existing
+        capability data on disk must be preserved. This guards against the
+        frontend sending an empty capabilities dict on cold-start (before
+        the form is opened) and accidentally wiping the saved data."""
+        provider = cfg.add_provider({
+            "name": "Kilo",
+            "baseUrl": "https://api.kilo.ai/api/gateway",
+            "authScheme": "bearer",
+            "apiFormat": "anthropic",
+            "modelCapabilities": {
+                "minimax/minimax-m3": {"supports1m": True, "supportsImages": True},
+            },
+        })
+
+        # Simulate a payload where the frontend form was never opened, so
+        # modelCapabilities is missing entirely from the request.
+        updated = cfg.update_provider(provider["id"], {
+            "name": "Kilo",
+            "baseUrl": "https://api.kilo.ai/api/gateway",
+            "authScheme": "bearer",
+            "apiFormat": "anthropic",
+            "models": {"opus_4_7": "minimax/minimax-m3"},
+        })
+
+        self.assertIn("minimax/minimax-m3", updated["modelCapabilities"])
+        self.assertTrue(updated["modelCapabilities"]["minimax/minimax-m3"]["supports1m"])
+        self.assertTrue(updated["modelCapabilities"]["minimax/minimax-m3"]["supportsImages"])
+
     def test_all_builtin_presets_expose_only_explicit_provider_models(self):
         """内置预设只把显式映射的 Claude route 暴露给 Claude Desktop。"""
         for preset in cfg.get_presets():
