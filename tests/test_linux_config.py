@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -139,6 +140,7 @@ class LinuxConfigTests(unittest.TestCase):
                 candidates = backend_main._claude_code_helper_candidates()
                 self.assertIn(Path(helper_bin), candidates)
 
+    @unittest.skipIf(sys.platform == "win32", "fcntl is POSIX only")
     def test_linux_single_instance_locking(self):
         with patch("sys.platform", "linux"):
             with patch.object(cfg, "CONFIG_DIR", self.temp_dir.name):

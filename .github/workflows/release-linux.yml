@@ -1,0 +1,124 @@
+name: Release Linux
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version without v prefix (e.g. 1.0.26)"
+        required: false
+        default: "1.0.26"
+        type: string
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build_linux:
+    name: Build & Release Linux x64
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Resolve release version
+        id: vars
+        shell: bash
+        run: |
+          version="${{ github.event.inputs.version }}"
+          if [[ -z "$version" ]]; then
+            if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+              version="${GITHUB_REF_NAME#v}"
+            else
+              version=$(python -c "import re, sys; m=re.search(r'^APP_VERSION\s*=\s*[\"\\\']([^\"\\\']+)[\"\\\']', open('main.py').read(), re.M); print(m.group(1))")
+            fi
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+
+      - name: Build standalone Linux bundle
+        env:
+          CCDS_VERSION: ${{ steps.vars.outputs.version }}
+        run: |
+          bash scripts/build-linux.sh
+
+      - name: Generate SHA256 checksums
+        run: |
+          cd dist/linux
+          for file in *.tar.gz; do
+            sha256sum "$file" > "${file}.sha256"
+          done
+
+      - name: Smoke test standalone Linux binary
+        shell: bash
+        run: |
+          app_exe="dist/linux/CC-Desktop-Switch/CC-Desktop-Switch"
+          if [[ ! -x "$app_exe" ]]; then
+            echo "Executable not found: $app_exe" >&2
+            exit 1
+          fi
+
+          export HOME="$RUNNER_TEMP/ccds-home"
+          mkdir -p "$HOME"
+          "$app_exe" --server-only --port 19081 &
+          app_pid=$!
+          cleanup() {
+            kill "$app_pid" 2>/dev/null || true
+            wait "$app_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          ok=0
+          for _ in {1..30}; do
+            if curl -fsS "http://127.0.0.1:19081/api/ready" >/dev/null; then
+              ok=1
+              echo "Smoke test passed on port 19081"
+              break
+            fi
+            sleep 1
+          done
+
+          if [[ "$ok" != "1" ]]; then
+            echo "Smoke test failed to reach /api/ready" >&2
+            exit 1
+          fi
+
+      - name: Upload artifacts to workflow run
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-linux-x64
+          path: |
+            dist/linux/*.tar.gz
+            dist/linux/*.sha256
+          retention-days: 7
+
+      - name: Publish to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.vars.outputs.tag }}
+          VERSION: ${{ steps.vars.outputs.version }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG exists. Uploading assets..."
+            gh release upload "$TAG" dist/linux/*.tar.gz dist/linux/*.sha256 --clobber
+          else
+            echo "Creating release $TAG..."
+            gh release create "$TAG" dist/linux/*.tar.gz dist/linux/*.sha256 \
+              --title "CC Desktop Switch $TAG" \
+              --notes "Linux release assets for CC Desktop Switch $TAG."
+          fi
