@@ -665,6 +665,7 @@ class ProviderConfigTests(unittest.TestCase):
         ])
         self.assertIs(saved["enterpriseConfig"]["isClaudeCodeForDesktopEnabled"], True)
         self.assertEqual(saved["enterpriseConfig"]["coworkEgressAllowedHosts"], ["*"])
+        self.assertIs(saved["enterpriseConfig"]["chatTabEnabled"], True)
 
     def test_macos_apply_config_writes_active_config_library_entry(self):
         json_path = os.path.join(self.temp_dir.name, "Claude-3p", "claude_desktop_config.json")
@@ -709,6 +710,7 @@ class ProviderConfigTests(unittest.TestCase):
         ])
         self.assertIs(saved["isClaudeCodeForDesktopEnabled"], True)
         self.assertEqual(saved["coworkEgressAllowedHosts"], ["*"])
+        self.assertIs(saved["chatTabEnabled"], True)
 
     def test_macos_status_prefers_json_runtime_values_over_stale_plist_models(self):
         json_path = os.path.join(self.temp_dir.name, "Claude-3p", "claude_desktop_config.json")
@@ -1057,6 +1059,7 @@ class ProviderConfigTests(unittest.TestCase):
             "inferenceModels",
             "isClaudeCodeForDesktopEnabled",
             "coworkEgressAllowedHosts",
+            "chatTabEnabled",
             "ccds_managed",
             "unrelatedPreference",
         ]
@@ -1072,6 +1075,7 @@ class ProviderConfigTests(unittest.TestCase):
                 "inferenceModels",
                 "isClaudeCodeForDesktopEnabled",
                 "coworkEgressAllowedHosts",
+                "chatTabEnabled",
                 "ccds_managed",
             ],
         )
@@ -1185,6 +1189,28 @@ class ProviderConfigTests(unittest.TestCase):
         inference_model_names = [item["name"] for item in inference_models]
         self.assertIn("claude-haiku-4-5-20251001", inference_model_names)
         self.assertNotIn("deepseek-v4-pro", inference_model_names)
+
+    def test_bracket_variant_route_ids_are_accepted(self):
+        provider = {
+            "id": "third-party",
+            "name": "Third-Party 1M",
+            "models": {
+                "claude-opus-4-7[1m]": "minimax-m3",
+            },
+            "modelCapabilities": {
+                "minimax-m3": {"supports1m": True},
+            },
+        }
+
+        desktop_models = registry.provider_inference_models(provider)
+        names = {item["name"] for item in desktop_models}
+        self.assertIn("claude-opus-4-7[1m]", names)
+        entry = next(item for item in desktop_models if item["name"] == "claude-opus-4-7[1m]")
+        self.assertTrue(entry.get("supports1m"))
+
+        inference_models = json.loads(registry.serialize_inference_models(provider))
+        inference_model_names = [item["name"] for item in inference_models]
+        self.assertIn("claude-opus-4-7[1m]", inference_model_names)
 
     def test_settings_fall_back_to_default_update_url(self):
         config = copy.deepcopy(cfg.DEFAULT_CONFIG)
@@ -2690,7 +2716,7 @@ class AdminApiTests(unittest.TestCase):
 
 
 class ReleaseManifestTests(unittest.TestCase):
-    VERSION = "1.0.25"
+    VERSION = "1.0.26"
 
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()

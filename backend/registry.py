@@ -25,6 +25,7 @@ DESKTOP_CONFIG = {
     "inferenceGatewayBaseUrl": ("http://127.0.0.1:18080", str),
     "isClaudeCodeForDesktopEnabled": (1, int),
     "coworkEgressAllowedHosts": (COWORK_EGRESS_ALLOWED_HOSTS, str),
+    "chatTabEnabled": ("true", str),
 }
 
 # ── 辅助函数 ──
@@ -231,6 +232,7 @@ New-ItemProperty -LiteralPath $path -Name 'inferenceGatewayHeaders' -Value $gate
 New-ItemProperty -LiteralPath $path -Name 'inferenceModels' -Value $inferenceModels -PropertyType String -Force | Out-Null
 New-ItemProperty -LiteralPath $path -Name 'isClaudeCodeForDesktopEnabled' -Value 1 -PropertyType DWord -Force | Out-Null
 New-ItemProperty -LiteralPath $path -Name 'coworkEgressAllowedHosts' -Value $coworkEgressAllowedHosts -PropertyType String -Force | Out-Null
+New-ItemProperty -LiteralPath $path -Name 'chatTabEnabled' -Value 'true' -PropertyType String -Force | Out-Null
 New-ItemProperty -LiteralPath $path -Name '{CCDS_MARKER}' -Value 'true' -PropertyType String -Force | Out-Null
 """
     ok, output = _run_elevated_powershell(script)
@@ -285,6 +287,7 @@ def _win_apply_config(
             "inferenceModels": (inference_models, winreg.REG_SZ),
             "isClaudeCodeForDesktopEnabled": (1, winreg.REG_DWORD),
             "coworkEgressAllowedHosts": (COWORK_EGRESS_ALLOWED_HOSTS, winreg.REG_SZ),
+            "chatTabEnabled": ("true", winreg.REG_SZ),
             CCDS_MARKER: ("true", winreg.REG_SZ),
         }
         for name, (value, type_) in values.items():
@@ -545,6 +548,7 @@ def _mac_json_enterprise_config(
         "inferenceModels": _mac_json_inference_models(inference_models),
         "isClaudeCodeForDesktopEnabled": True,
         "coworkEgressAllowedHosts": _mac_json_policy_list(COWORK_EGRESS_ALLOWED_HOSTS),
+        "chatTabEnabled": True,
     }
 
 
@@ -561,6 +565,8 @@ def _mac_json_status_keys(enterprise_config: dict) -> dict:
         if name == "coworkEgressAllowedHosts" and isinstance(value, list):
             value = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
         if name == "isClaudeCodeForDesktopEnabled" and isinstance(value, bool):
+            value = int(value)
+        if name == "chatTabEnabled" and isinstance(value, bool):
             value = int(value)
         keys[name] = _safe_config_value(name, value)
     return keys

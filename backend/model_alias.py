@@ -48,7 +48,7 @@ MODEL_ORDER = tuple(item["key"] for item in MODEL_SLOTS)
 DEFAULT_MODEL_KEY = "default"
 LEGACY_MODEL_KEYS = ("default", "sonnet", "opus", "haiku")
 MODEL_MAPPING_KEYS = set(MODEL_ORDER) | set(LEGACY_MODEL_KEYS)
-CUSTOM_ROUTE_RE = re.compile(r"^claude-[A-Za-z0-9][A-Za-z0-9._-]*$")
+CUSTOM_ROUTE_RE = re.compile(r"^claude-[A-Za-z0-9][A-Za-z0-9._\[\]-]*$")
 CLAUDE_ID_TO_SLOT = {
     claude_id.lower(): slot["key"]
     for slot in MODEL_SLOTS

@@ -361,7 +361,7 @@
   }
 
   function isSafeCustomRoute(route) {
-    return /^claude-[A-Za-z0-9][A-Za-z0-9._-]*$/.test(String(route || "").trim());
+    return /^claude-[A-Za-z0-9][A-Za-z0-9._\[\]-]*$/.test(String(route || "").trim());
   }
 
   function splitCustomMappings(mappings = {}) {
@@ -374,7 +374,7 @@
   function normalizeCapabilities(capabilities = {}) {
     if (!capabilities || typeof capabilities !== "object") return {};
     return Object.fromEntries(Object.entries(capabilities).filter(([, value]) => (
-      value && typeof value === "object" && value.supports1m === true
+      value && typeof value === "object"
     )));
   }
 
@@ -540,10 +540,7 @@
   }
 
   function capabilitiesForCurrentMappings(mappings = collectProviderMappings()) {
-    const usedModelIds = new Set(Object.values(mappings).filter(Boolean));
-    return Object.fromEntries(Object.entries(normalizeCapabilities(formModelCapabilities)).filter(([modelId]) => (
-      usedModelIds.has(modelId)
-    )));
+    return normalizeCapabilities(formModelCapabilities);
   }
 
   function formMappingRowsFromMappings(mappings = {}) {

@@ -2,8 +2,10 @@
 
 ## English
 
-This patch release hardens provider editing, upstream diagnostics, uninstall cleanup, and the cross-platform release gate.
+This patch release adds native Linux support, hardens provider editing and upstream diagnostics, and enables the Chat tab for third-party inference.
 
+- Added native Linux support for Claude Desktop configuration (`~/.config/Claude/claude_desktop_config.json` and `configLibrary`), single instance locking, and desktop lifecycle.
+- Added `chatTabEnabled` to the Claude Desktop policy writes so the Chat tab appears alongside Cowork and Code after applying the local gateway config.
 - Fixed provider model mappings with legacy aliases being restored after the user explicitly removed Opus, Sonnet, or Haiku slots.
 - Tightened DeepSeek Max compatibility detection. Authentication, URL, model, context-length, and unrelated parameter errors now keep their original upstream diagnosis instead of being mislabeled as “Max is unsupported.”
 - Fixed lowercase and canonical OpenAI-compatible preset metadata so presets are routed through the existing API-format normalizer.
@@ -18,8 +20,10 @@ No provider migration is required. After upgrading, re-apply the active provider
 
 ## 简体中文
 
-本次补丁版重点加固 provider 编辑、上游错误诊断、卸载清理和跨平台发布门禁。
+本次补丁版新增 Linux 原生支持，加固 provider 编辑、上游错误诊断、卸载清理，并在 3P 配置中启用 Chat tab。
 
+- 新增 Linux 原生支持：支持管理 Claude Desktop 3P 配置（`~/.config/Claude/claude_desktop_config.json` 与 `configLibrary`）、单实例文件锁与桌面生命周期。
+- 在 Claude Desktop policy 写入里新增 `chatTabEnabled`，一键应用后 Chat tab 会和 Cowork、Code 一起显示。
 - 修复带旧别名的模型映射在用户明确删除 Opus、Sonnet 或 Haiku 槽位后又自动恢复的问题。
 - 收紧 DeepSeek Max 兼容错误判断。鉴权、URL、模型、上下文长度和其他参数错误会保留真实上游诊断，不再被误报为“模型不支持 Max”。
 - 修复小写及规范 OpenAI 兼容预设元数据的处理，统一交给现有 API 格式归一化逻辑。
@@ -31,3 +35,4 @@ No provider migration is required. After upgrading, re-apply the active provider
 ### 升级说明
 
 无需迁移 provider。升级后请重新对当前 provider 执行“一键应用到 Claude 桌面版”，并完整重启 Claude Desktop。卸载 v1.0.25 及更早版本前，建议先执行“清除桌面版配置”。
+

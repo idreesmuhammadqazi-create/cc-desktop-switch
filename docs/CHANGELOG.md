@@ -11,11 +11,13 @@
 
 Release notes: [docs/release-notes-v1.0.26.md](release-notes-v1.0.26.md)
 
+- Added Linux support for Claude Desktop configuration and process lifecycle.
 - Fixed legacy model aliases restoring explicitly removed Opus, Sonnet, and Haiku mappings.
 - Preserved real upstream errors unless a response explicitly rejects thinking/effort fields.
 - Normalized OpenAI-compatible preset metadata.
 - Cleaned only CCDS-managed Claude policy values during a real Windows uninstall while preserving upgrades.
 - Added cross-platform CI, NSIS compilation, and current Node 24 GitHub Actions.
+- Added `chatTabEnabled` to the Claude Desktop 3P policy writes so the Chat tab appears alongside Cowork and Code after applying the local gateway config.
 
 ## v1.0.25
 
