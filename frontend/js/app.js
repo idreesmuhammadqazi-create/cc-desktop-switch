@@ -540,6 +540,7 @@
   }
 
   function capabilitiesForCurrentMappings(mappings = collectProviderMappings()) {
+    const usedModelIds = new Set(Object.values(mappings).filter(Boolean));
     return normalizeCapabilities(formModelCapabilities);
   }
 
