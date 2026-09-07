@@ -496,6 +496,15 @@ def _claude_code_helper_candidates() -> list[Path]:
         return list(Path(local_app_data).glob("Claude-3p/claude-code/*/claude.exe"))
     if sys.platform == "darwin":
         return list((home / "Library/Application Support/Claude-3p/claude-code").glob("*/claude"))
+    if sys.platform.startswith("linux"):
+        xdg_config = Path(os.environ.get("XDG_CONFIG_HOME") or (home / ".config"))
+        xdg_data = Path(os.environ.get("XDG_DATA_HOME") or (home / ".local/share"))
+        candidates = []
+        candidates.extend(xdg_config.glob("Claude-3p/claude-code/*/claude"))
+        candidates.extend(xdg_config.glob("Claude/claude-code/*/claude"))
+        candidates.extend(xdg_data.glob("Claude-3p/claude-code/*/claude"))
+        candidates.extend(xdg_data.glob("Claude/claude-code/*/claude"))
+        return candidates
     return []
 
 

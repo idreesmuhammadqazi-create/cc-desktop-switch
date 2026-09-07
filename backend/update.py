@@ -124,12 +124,28 @@ def pick_macos_installer(assets: list[dict[str, Any]]) -> dict[str, Any]:
     raise UpdateCheckError("当前版本没有 macOS 安装资产")
 
 
+def pick_linux_installer(assets: list[dict[str, Any]]) -> dict[str, Any]:
+    """优先选择 AppImage 或 deb 安装包，tar.gz 作为通用便携包兜底。"""
+    candidates = []
+    for asset in assets:
+        name = str(asset.get("name") or "").lower()
+        if name.endswith(".appimage"):
+            return asset
+        if name.endswith(".deb") or name.endswith(".tar.gz"):
+            candidates.append(asset)
+    if candidates:
+        return candidates[0]
+    raise UpdateCheckError("当前版本没有 Linux 安装资产")
+
+
 def pick_platform_installer(assets: list[dict[str, Any]], platform: str) -> dict[str, Any]:
     """按平台选择可直接启动的安装资产。"""
     if platform.startswith("windows-"):
         return pick_windows_installer(assets)
     if platform.startswith("macos-"):
         return pick_macos_installer(assets)
+    if platform.startswith("linux-"):
+        return pick_linux_installer(assets)
     raise UpdateCheckError(f"当前平台暂不支持应用内安装: {platform}")
 
 
@@ -138,6 +154,8 @@ def _allowed_install_extensions(platform: str) -> tuple[str, ...]:
         return (".exe",)
     if platform.startswith("macos-"):
         return (".pkg", ".dmg")
+    if platform.startswith("linux-"):
+        return (".appimage", ".deb", ".tar.gz")
     return ()
 
 
@@ -147,6 +165,8 @@ def install_command(path: str, platform: str) -> list[str]:
         return [path]
     if platform.startswith("macos-"):
         return ["open", path]
+    if platform.startswith("linux-"):
+        return ["xdg-open", path]
     raise UpdateCheckError(f"当前平台暂不支持应用内安装: {platform}")
 
 
@@ -195,6 +215,18 @@ def install_after_quit_command(path: str, platform: str, wait_for_pid: int) -> l
             'pid="$1"; installer="$2"; '
             'while kill -0 "$pid" 2>/dev/null; do sleep 0.2; done; '
             'exec open "$installer"',
+            "ccds-update-installer",
+            str(wait_for_pid),
+            path,
+        ]
+    if platform.startswith("linux-"):
+        return [
+            "/bin/sh",
+            "-c",
+            'pid="$1"; installer="$2"; '
+            'while kill -0 "$pid" 2>/dev/null; do sleep 0.2; done; '
+            'chmod +x "$installer" 2>/dev/null; '
+            'exec "$installer" 2>/dev/null || exec xdg-open "$installer"',
             "ccds-update-installer",
             str(wait_for_pid),
             path,

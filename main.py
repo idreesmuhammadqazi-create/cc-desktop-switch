@@ -4,6 +4,7 @@
 import argparse
 import ctypes
 import json
+import subprocess
 import sys
 import threading
 import time
@@ -36,6 +37,7 @@ _macos_app_delegate = None
 _macos_status_item = None
 _macos_status_delegate = None
 _single_instance_mutex = None
+_linux_lock_file = None
 MB_OK = 0x00000000
 MB_ICONINFORMATION = 0x00000040
 MB_SETFOREGROUND = 0x00010000
@@ -56,17 +58,34 @@ def safe_print(message: str):
 
 def show_message_box(title: str, message: str) -> bool:
     """显示原生提示框；不可用时返回 False。"""
-    try:
-        ctypes.windll.user32.MessageBoxW(
-            None,
-            message,
-            title,
-            MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND,
-        )
-        return True
-    except Exception as exc:
-        safe_print(f"message box failed: {exc}")
-        return False
+    if sys.platform == "win32":
+        try:
+            ctypes.windll.user32.MessageBoxW(
+                None,
+                message,
+                title,
+                MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND,
+            )
+            return True
+        except Exception as exc:
+            safe_print(f"message box failed: {exc}")
+            return False
+
+    if sys.platform.startswith("linux"):
+        for cmd in [
+            ["zenity", "--info", f"--title={title}", f"--text={message}"],
+            ["kdialog", "--msgbox", message, "--title", title],
+            ["notify-send", title, message],
+        ]:
+            try:
+                r = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
+                if r.returncode == 0:
+                    return True
+            except Exception:
+                continue
+
+    safe_print(f"[{title}] {message}")
+    return True
 
 
 def show_message_box_async(title: str, message: str):
@@ -79,39 +98,62 @@ def show_message_box_async(title: str, message: str):
 
 
 def acquire_single_instance_lock() -> bool:
-    """Windows 下创建单实例互斥锁；返回 False 表示已有实例在运行。"""
-    global _single_instance_mutex
-    if sys.platform != "win32":
-        return True
-
-    try:
-        kernel32 = ctypes.windll.kernel32
-        handle = kernel32.CreateMutexW(None, False, SINGLE_INSTANCE_MUTEX_NAME)
-        if not handle:
-            safe_print("single instance mutex creation returned empty handle")
+    """Windows / Linux 下创建单实例锁；返回 False 表示已有实例在运行。"""
+    global _single_instance_mutex, _linux_lock_file
+    if sys.platform == "win32":
+        try:
+            kernel32 = ctypes.windll.kernel32
+            handle = kernel32.CreateMutexW(None, False, SINGLE_INSTANCE_MUTEX_NAME)
+            if not handle:
+                safe_print("single instance mutex creation returned empty handle")
+                return True
+            already_running = kernel32.GetLastError() == ERROR_ALREADY_EXISTS
+            if already_running:
+                kernel32.CloseHandle(handle)
+                return False
+            _single_instance_mutex = handle
             return True
-        already_running = kernel32.GetLastError() == ERROR_ALREADY_EXISTS
-        if already_running:
-            kernel32.CloseHandle(handle)
+        except Exception as exc:
+            safe_print(f"single instance mutex failed: {exc}")
+            return True
+
+    if sys.platform.startswith("linux") or sys.platform == "darwin":
+        try:
+            import fcntl
+            cfg.ensure_config_dir()
+            lock_path = Path(cfg.CONFIG_DIR) / "app.lock"
+            _linux_lock_file = open(lock_path, "a+")
+            fcntl.flock(_linux_lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return True
+        except (BlockingIOError, OSError):
             return False
-        _single_instance_mutex = handle
-        return True
-    except Exception as exc:
-        safe_print(f"single instance mutex failed: {exc}")
-        return True
+        except Exception as exc:
+            safe_print(f"single instance file lock failed: {exc}")
+            return True
+
+    return True
 
 
 def release_single_instance_lock():
-    """释放单实例互斥锁句柄。"""
-    global _single_instance_mutex
-    if sys.platform != "win32" or not _single_instance_mutex:
-        return
-    try:
-        ctypes.windll.kernel32.CloseHandle(_single_instance_mutex)
-    except Exception as exc:
-        safe_print(f"single instance mutex release failed: {exc}")
-    finally:
-        _single_instance_mutex = None
+    """释放单实例锁句柄。"""
+    global _single_instance_mutex, _linux_lock_file
+    if sys.platform == "win32" and _single_instance_mutex:
+        try:
+            ctypes.windll.kernel32.CloseHandle(_single_instance_mutex)
+        except Exception as exc:
+            safe_print(f"single instance mutex release failed: {exc}")
+        finally:
+            _single_instance_mutex = None
+
+    if _linux_lock_file:
+        try:
+            import fcntl
+            fcntl.flock(_linux_lock_file.fileno(), fcntl.LOCK_UN)
+            _linux_lock_file.close()
+        except Exception as exc:
+            safe_print(f"single instance file lock release failed: {exc}")
+        finally:
+            _linux_lock_file = None
 
 
 def request_existing_instance_activate(admin_port: int, timeout: float = 3.0) -> bool:

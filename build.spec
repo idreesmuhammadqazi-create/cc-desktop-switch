@@ -13,6 +13,7 @@ CC Desktop Switch - PyInstaller 构建配置
 """
 
 import os
+import sys
 from pathlib import Path
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules, copy_metadata
 
@@ -22,6 +23,7 @@ ONEFILE = os.environ.get("CCDS_ONEFILE") == "1"
 CONSOLE = os.environ.get("CCDS_CONSOLE") == "1"
 ICON_FILE = FRONTEND / "assets" / "app-icon.ico"
 ICON = str(ICON_FILE) if ICON_FILE.exists() else None
+EXE_KWARGS = {"uac_admin": True} if sys.platform == "win32" else {}
 
 WEBVIEW_HIDDENIMPORTS = collect_submodules("webview")
 WEBVIEW_DATAS = collect_data_files("webview") + copy_metadata("pywebview")
@@ -99,7 +101,7 @@ if ONEFILE:
         codesign_identity=None,
         entitlements_file=None,
         icon=ICON,
-        uac_admin=True,
+        **EXE_KWARGS,
     )
 else:
     exe = EXE(
@@ -121,7 +123,7 @@ else:
         codesign_identity=None,
         entitlements_file=None,
         icon=ICON,
-        uac_admin=True,
+        **EXE_KWARGS,
     )
     COLLECT(
         exe,

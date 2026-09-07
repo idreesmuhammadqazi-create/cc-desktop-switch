@@ -16,9 +16,9 @@
 
 CC Desktop Switch is a lightweight desktop app for the official Claude Desktop client. It lets you manage third-party Anthropic-compatible API providers such as DeepSeek, Kimi, Zhipu GLM, Alibaba Cloud Bailian, and Xiaomi MiMo, then apply the right Claude Desktop 3P configuration with one click.
 
-This project is focused on Claude Desktop on Windows and macOS. It is different from CLI-oriented tools such as `farion1231/cc-switch`: the goal here is to give regular desktop users a simple UI for provider setup, model mapping, health checks, and local gateway compatibility.
+This project supports Claude Desktop on Windows, macOS, and Linux. It is different from CLI-oriented tools such as `farion1231/cc-switch`: the goal here is to give regular desktop users a simple UI for provider setup, model mapping, health checks, and local gateway compatibility.
 
-Since v1.0.18, Claude Desktop is configured to call the local CC Desktop Switch gateway at `127.0.0.1`. Keep CC Desktop Switch running in the background when using third-party providers. Closing the window keeps the app available in the tray on Windows or hidden in the Dock app lifecycle on macOS.
+Since v1.0.18, Claude Desktop is configured to call the local CC Desktop Switch gateway at `127.0.0.1`. Keep CC Desktop Switch running in the background when using third-party providers. Closing the window keeps the app available in the tray on Windows and Linux, or hidden in the Dock app lifecycle on macOS.
 
 ## Preview
 
@@ -52,13 +52,13 @@ Since v1.0.18, Claude Desktop is configured to call the local CC Desktop Switch 
 ## What It Does
 
 - Manages DeepSeek, Kimi, Zhipu GLM, Alibaba Cloud Bailian, Xiaomi MiMo, and custom third-party providers.
-- Applies Claude Desktop third-party inference settings on Windows and macOS.
+- Applies Claude Desktop third-party inference settings on Windows, macOS, and Linux.
 - Uses a local gateway to keep model mapping, protocol compatibility, extra headers, and upstream keys under local control.
 - Shows only explicitly mapped Claude-safe model routes in Claude Desktop.
 - Rejects unmapped Claude model routes instead of silently falling back to an internal default.
 - Imports Anthropic-compatible CC-Switch configurations while leaving OpenAI-format entries opt-in.
 - Provides provider connectivity checks, model availability checks, SSE streaming, and custom upstream HTTP/SOCKS proxy support.
-- Prevents duplicate Windows app instances: launching the shortcut again brings the existing window forward.
+- Prevents duplicate app instances: launching the shortcut again brings the existing window forward.
 
 ## Download
 
@@ -105,16 +105,17 @@ CC Desktop Switch keeps those real upstream model IDs inside the local gateway a
 
 ## Development
 
-```powershell
+```bash
 git clone https://github.com/lonr-6/cc-desktop-switch.git
 cd cc-desktop-switch
 pip install -r requirements.txt
-python main.py
+./start.sh   # Linux / macOS (or python main.py)
+# On Windows: start.bat
 ```
 
 Browser fallback for development:
 
-```powershell
+```bash
 python main.py --browser
 ```
 

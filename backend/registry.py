@@ -86,8 +86,8 @@ def _os_name() -> str:
 
 
 def _not_supported() -> dict:
-    """非 Windows 且非 macOS 时的提示"""
-    return {"success": False, "message": "Claude Desktop 没有 Linux GUI 版本，无需配置"}
+    """非 Windows、macOS 且非 Linux 时的提示"""
+    return {"success": False, "message": "当前操作系统暂不支持配置 Claude Desktop"}
 
 
 def provider_inference_models(provider: Optional[dict]) -> list:
@@ -885,6 +885,245 @@ def _mac_clear_config() -> dict:
     return {"success": False, "message": "macOS 配置部分清除失败: " + "; ".join(failures)}
 
 
+# ── Linux ──
+
+LINUX_CLAUDE_CONFIG = "~/.config/Claude/claude_desktop_config.json"
+LINUX_3P_CONFIG = "~/.config/Claude-3p/claude_desktop_config.json"
+LINUX_3P_CONFIG_LIBRARY = "configLibrary"
+
+
+def _linux_config_json_paths() -> list[str]:
+    """返回 Linux 下 Claude Desktop 的配置文件路径。优先检测已存在目录，默认至少包含标准路径。"""
+    xdg_config = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
+
+    def _resolve(path_tmpl: str, default_folder: str) -> str:
+        expanded = os.path.expanduser(path_tmpl)
+        if expanded.startswith("~"):
+            return os.path.join(xdg_config, default_folder, "claude_desktop_config.json")
+        return expanded
+
+    std_path = _resolve(LINUX_CLAUDE_CONFIG, "Claude")
+    p3_path = _resolve(LINUX_3P_CONFIG, "Claude-3p")
+
+    paths = []
+    if os.path.exists(std_path):
+        paths.append(std_path)
+    if os.path.exists(p3_path) and p3_path not in paths:
+        paths.append(p3_path)
+
+    if not paths:
+        if os.path.isdir(os.path.dirname(p3_path)):
+            paths.append(p3_path)
+        else:
+            paths.append(std_path)
+    return paths
+
+
+def _linux_config_library_dir_paths() -> list[str]:
+    """返回 Linux 下 configLibrary 目录路径。"""
+    json_paths = _linux_config_json_paths()
+    return [os.path.join(os.path.dirname(p), LINUX_3P_CONFIG_LIBRARY) for p in json_paths]
+
+
+def _linux_get_config_status() -> dict:
+    json_paths = _linux_config_json_paths()
+    library_dirs = _linux_config_library_dir_paths()
+
+    library_keys = {}
+    library_configured = False
+    for library_dir in library_dirs:
+        meta_path = os.path.join(library_dir, "_meta.json")
+        ok, meta, _ = _mac_read_json_file(meta_path)
+        if not ok or not meta:
+            continue
+        applied_id = str(meta.get("appliedId") or "").strip()
+        if not applied_id:
+            continue
+        entry_path = os.path.join(library_dir, f"{applied_id}.json")
+        ok, data, _ = _mac_read_json_file(entry_path)
+        if ok and data:
+            keys = _mac_flat_config_status_keys(data)
+            if keys:
+                library_keys = keys
+                library_configured = keys.get("inferenceProvider") == "gateway"
+                break
+
+    json_keys = {}
+    json_configured = False
+    file_exists = False
+    for path in json_paths:
+        if os.path.exists(path):
+            file_exists = True
+        ok, data, _ = _mac_read_json_file(path)
+        if ok and isinstance(data, dict):
+            enterprise_config = data.get("enterpriseConfig")
+            if isinstance(enterprise_config, dict) and enterprise_config:
+                keys = _mac_json_status_keys(enterprise_config)
+                if keys:
+                    json_keys = keys
+                    json_configured = (
+                        data.get("deploymentMode") == "3p"
+                        and keys.get("inferenceProvider") == "gateway"
+                    )
+                    break
+
+    if library_keys:
+        keys = library_keys
+        configured = library_configured
+        active_source = "configLibrary"
+        key_sources = {name: "configLibrary" for name in keys}
+    elif json_keys:
+        keys = json_keys
+        configured = json_configured
+        active_source = "json"
+        key_sources = {name: "json" for name in keys}
+    else:
+        keys = {}
+        configured = False
+        active_source = ""
+        key_sources = {}
+
+    return {
+        "configured": configured,
+        "keys": keys,
+        "message": "" if configured or file_exists else "Claude Desktop 尚未在当前机器配置",
+        "activeSource": active_source,
+        "keySources": key_sources,
+        "sources": {
+            "json": json_configured,
+            "configLibrary": library_configured,
+        },
+        "exists": file_exists,
+    }
+
+
+def _linux_apply_config(
+    base_url: str,
+    gateway_api_key: str = "",
+    inference_models: str = "",
+    auth_scheme: str = "bearer",
+    gateway_headers: str = "",
+) -> dict:
+    json_paths = _linux_config_json_paths()
+    failures = []
+
+    expected = _mac_json_enterprise_config(
+        base_url,
+        gateway_api_key,
+        inference_models or DESKTOP_CONFIG["inferenceModels"][0],
+        auth_scheme,
+        gateway_headers,
+    )
+
+    for path in json_paths:
+        ok, data, message = _mac_read_json_file(path)
+        if not ok:
+            failures.append(f"{os.path.basename(path)}: 读取失败: {message}")
+            continue
+        enterprise_config = data.get("enterpriseConfig")
+        if not isinstance(enterprise_config, dict):
+            enterprise_config = {}
+        enterprise_config.update(expected)
+        data["deploymentMode"] = "3p"
+        data["enterpriseConfig"] = enterprise_config
+
+        ok, message = _mac_write_json_file(path, data)
+        if not ok:
+            failures.append(f"{os.path.basename(path)}: 写入失败: {message}")
+            continue
+
+        ok, saved, message = _mac_read_json_file(path)
+        if not ok:
+            failures.append(f"{os.path.basename(path)}: 读回校验失败: {message}")
+            continue
+        saved_enterprise = saved.get("enterpriseConfig")
+        if not isinstance(saved_enterprise, dict) or saved.get("deploymentMode") != "3p":
+            failures.append(f"{os.path.basename(path)}: deploymentMode 或 enterpriseConfig 校验失败")
+            continue
+        for name, value in expected.items():
+            if saved_enterprise.get(name) != value:
+                failures.append(f"{os.path.basename(path)}: {name} 读回不匹配")
+
+    for library_dir in _linux_config_library_dir_paths():
+        meta_path = os.path.join(library_dir, "_meta.json")
+        ok, meta, _ = _mac_read_json_file(meta_path)
+        applied_id = str(meta.get("appliedId") or "").strip() if ok else ""
+        if not applied_id or "/" in applied_id or "\\" in applied_id:
+            applied_id = str(uuid.uuid4())
+            meta = {"appliedId": applied_id}
+            ok, msg = _mac_write_json_file(meta_path, meta)
+            if not ok:
+                failures.append(f"configLibrary _meta.json 写入失败: {msg}")
+                continue
+
+        entry_path = os.path.join(library_dir, f"{applied_id}.json")
+        ok, data, _ = _mac_read_json_file(entry_path)
+        data.update(expected)
+        ok, msg = _mac_write_json_file(entry_path, data)
+        if not ok:
+            failures.append(f"configLibrary entry 写入失败: {msg}")
+
+    if failures:
+        return {"success": False, "message": "Linux Desktop 3P 配置写入失败: " + "; ".join(failures)}
+    return {"success": True, "message": "Linux Desktop 3P 配置已应用"}
+
+
+def _linux_clear_config() -> dict:
+    json_paths = _linux_config_json_paths()
+    library_dirs = _linux_config_library_dir_paths()
+    failures = []
+
+    for path in json_paths:
+        if not os.path.exists(path):
+            continue
+        ok, data, msg = _mac_read_json_file(path)
+        if not ok:
+            failures.append(f"{os.path.basename(path)}: 读取失败: {msg}")
+            continue
+        changed = False
+        if "enterpriseConfig" in data:
+            data.pop("enterpriseConfig", None)
+            changed = True
+        if data.get("deploymentMode") != "clear":
+            data["deploymentMode"] = "clear"
+            changed = True
+        if changed:
+            ok, msg = _mac_write_json_file(path, data)
+            if not ok:
+                failures.append(f"{os.path.basename(path)}: 写入失败: {msg}")
+
+    managed = set(DESKTOP_CONFIG.keys()) | {
+        "provider",
+        "apiKey",
+        "authScheme",
+        "baseUrl",
+        "models",
+    }
+    for library_dir in library_dirs:
+        if not os.path.isdir(library_dir):
+            continue
+        for name in sorted(os.listdir(library_dir)):
+            if not name.endswith(".json") or name == "_meta.json":
+                continue
+            entry_path = os.path.join(library_dir, name)
+            ok, data, msg = _mac_read_json_file(entry_path)
+            if not ok:
+                continue
+            changed = False
+            for key in managed:
+                if key in data:
+                    data.pop(key, None)
+                    changed = True
+            if changed:
+                ok, msg = _mac_write_json_file(entry_path, data)
+                if not ok:
+                    failures.append(f"configLibrary/{name}: 写入失败: {msg}")
+
+    if failures:
+        return {"success": False, "message": "Linux Desktop 3P 配置部分清除失败: " + "; ".join(failures)}
+    return {"success": True, "message": "Linux Desktop 3P 配置已清除"}
+
+
 # ── 统一入口 ──
 
 def is_configured() -> bool:
@@ -900,7 +1139,9 @@ def get_config_status() -> dict:
         return _win_get_config_status()
     elif os_name == "mac":
         return _mac_get_config_status()
-    return {"configured": False, "keys": {}, "message": "仅 Windows / macOS 需要配置"}
+    elif os_name == "linux":
+        return _linux_get_config_status()
+    return {"configured": False, "keys": {}, "message": "仅 Windows / macOS / Linux 需要配置"}
 
 
 def apply_config(
@@ -919,6 +1160,8 @@ def apply_config(
         return _win_apply_config(base_url, gateway_api_key, inference_models, auth_scheme, gateway_headers)
     elif os_name == "mac":
         return _mac_apply_config(base_url, gateway_api_key, inference_models, auth_scheme, gateway_headers)
+    elif os_name == "linux":
+        return _linux_apply_config(base_url, gateway_api_key, inference_models, auth_scheme, gateway_headers)
     return _not_supported()
 
 
@@ -929,4 +1172,7 @@ def clear_config() -> dict:
         return _win_clear_config()
     elif os_name == "mac":
         return _mac_clear_config()
+    elif os_name == "linux":
+        return _linux_clear_config()
     return _not_supported()
+

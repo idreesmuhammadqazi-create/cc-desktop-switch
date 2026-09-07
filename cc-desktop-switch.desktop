@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=CC Desktop Switch
+Comment=Switch third-party API providers and models for Claude Desktop
+Exec=cc-desktop-switch %u
+Icon=cc-desktop-switch
+Terminal=false
+Type=Application
+Categories=Utility;Development;
+StartupNotify=true
+Keywords=Claude;AI;LLM;Desktop;Switch;
